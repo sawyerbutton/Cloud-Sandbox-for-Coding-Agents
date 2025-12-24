@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloud-sandbox
+
+resources:
+- namespace.yaml
+- rbac.yaml
+- secrets.yaml
+- gateway-deployment.yaml
+- scheduler-deployment.yaml
+- session-manager-deployment.yaml
+- ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: cloud-sandbox
+  app.kubernetes.io/version: "0.1.0"
+  app.kubernetes.io/managed-by: kustomize

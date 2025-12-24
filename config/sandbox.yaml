@@ -1,0 +1,102 @@
+# Cloud Sandbox Configuration
+# This is the default configuration for development environment
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  grpc_port: 9090
+  read_timeout: 30s
+  write_timeout: 30s
+
+# Sandbox configuration (MVP: Docker-based)
+sandbox:
+  # Runtime: "docker" for MVP, "firecracker" for production
+  runtime: "docker"
+
+  # Default container image
+  default_image: "python:3.11-slim"
+
+  # Resource limits
+  vcpu_count: 2
+  mem_size_mb: 2048
+  disk_size_mb: 10240
+
+  # Execution limits
+  max_execution_time: 300s
+  max_output_size: 10485760  # 10MB
+
+  # Network
+  network_enabled: true
+  allowed_hosts:
+    - "pypi.org"
+    - "files.pythonhosted.org"
+    - "registry.npmjs.org"
+    - "github.com"
+
+# Sandbox pool configuration
+pool:
+  min_size: 2
+  max_size: 50
+  warmup_size: 5
+  idle_timeout: 30m
+  cleanup_interval: 5m
+
+# Session configuration
+session:
+  default_ttl: 24h
+  max_ttl: 168h  # 7 days
+  cleanup_interval: 1h
+
+# Storage configuration
+storage:
+  # Workspace storage backend
+  backend: "minio"  # "minio" or "local"
+
+  # Local storage (for development)
+  local_path: "/var/lib/sandbox/workspaces"
+
+  # MinIO configuration
+  minio:
+    endpoint: "localhost:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    bucket: "sandbox-workspaces"
+    use_ssl: false
+
+# Database configuration
+database:
+  driver: "postgres"
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "postgres"
+  dbname: "sandbox"
+  sslmode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+
+# Redis configuration
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 10
+
+# Authentication
+auth:
+  enabled: true
+  jwt_secret: "your-secret-key-change-in-production"
+  token_expiry: 24h
+
+# Logging
+logging:
+  level: "debug"  # debug, info, warn, error
+  format: "json"  # json, text
+  output: "stdout"
+
+# Metrics
+metrics:
+  enabled: true
+  port: 9091
+  path: "/metrics"

@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: session-manager
+  namespace: cloud-sandbox
+  labels:
+    app.kubernetes.io/name: cloud-sandbox
+    app.kubernetes.io/component: session-manager
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: session-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cloud-sandbox
+        app.kubernetes.io/component: session-manager
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: cloud-sandbox
+      containers:
+      - name: session-manager
+        image: cloud-sandbox/session-manager:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 9091
+          protocol: TCP
+        env:
+        - name: POSTGRES_HOST
+          value: "postgresql"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sandbox-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sandbox-secrets
+              key: postgres-password
+        - name: POSTGRES_DB
+          value: "sandbox"
+        - name: REDIS_ADDR
+          value: "redis:6379"
+        - name: MINIO_ENDPOINT
+          value: "minio:9000"
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sandbox-secrets
+              key: minio-access-key
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sandbox-secrets
+              key: minio-secret-key
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: session-manager
+  namespace: cloud-sandbox
+  labels:
+    app.kubernetes.io/name: cloud-sandbox
+    app.kubernetes.io/component: session-manager
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9091
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/component: session-manager

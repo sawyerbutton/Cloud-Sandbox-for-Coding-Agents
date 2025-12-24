@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.gateway
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      - scheduler
+      - session-manager
+      - redis
+    environment:
+      - CONFIG_PATH=/app/config/sandbox.yaml
+      - SCHEDULER_URL=scheduler:9090
+      - SESSION_MANAGER_URL=session-manager:9090
+      - REDIS_ADDR=redis:6379
+    volumes:
+      - ./config:/app/config:ro
+    networks:
+      - sandbox-net
+
+  # Sandbox Scheduler
+  scheduler:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.scheduler
+    ports:
+      - "9092:9090"
+    depends_on:
+      - redis
+    environment:
+      - CONFIG_PATH=/app/config/sandbox.yaml
+      - REDIS_ADDR=redis:6379
+    volumes:
+      - ./config:/app/config:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-data:/var/lib/sandbox
+    networks:
+      - sandbox-net
+
+  # Session Manager
+  session-manager:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.session-manager
+    ports:
+      - "9093:9090"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      - CONFIG_PATH=/app/config/sandbox.yaml
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/sandbox?sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - MINIO_ENDPOINT=minio:9000
+    volumes:
+      - ./config:/app/config:ro
+    networks:
+      - sandbox-net
+
+  # PostgreSQL - Session storage
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=sandbox
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sandbox-net
+
+  # Redis - Cache and pub/sub
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sandbox-net
+
+  # MinIO - Workspace storage
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sandbox-net
+
+  # Prometheus - Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9094:9090"
+    volumes:
+      - ./deploy/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - sandbox-net
+
+  # Grafana - Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - sandbox-net
+
+networks:
+  sandbox-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  sandbox-data:
+  prometheus-data:
+  grafana-data:

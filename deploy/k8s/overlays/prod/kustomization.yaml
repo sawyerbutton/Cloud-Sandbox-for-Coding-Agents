@@ -1,0 +1,66 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cloud-sandbox-prod
+
+resources:
+- ../../base
+
+nameSuffix: -prod
+
+commonLabels:
+  environment: prod
+
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+  target:
+    kind: Deployment
+    name: gateway
+
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+  target:
+    kind: Deployment
+    name: scheduler
+
+- patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+  target:
+    kind: Deployment
+    name: session-manager
+
+- patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: sandbox.example.com
+    - op: add
+      path: /spec/tls
+      value:
+      - hosts:
+        - sandbox.example.com
+        secretName: sandbox-tls
+  target:
+    kind: Ingress
+
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 200m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: 256Mi
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 1000m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 512Mi
+  target:
+    kind: Deployment
